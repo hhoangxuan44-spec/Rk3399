@@ -16,11 +16,11 @@ is_installed() {
 }
 
 # 1. 更新 apt 源
-echo "[1/6] 正在更新 apt 源..."
+echo "[1/7] 正在更新 apt 源..."
 apt-get update -y
 
 # 2. 安装基础中文支持
-echo "[2/6] 正在配置基础中文支持 (fonts-noto-cjk, locales)..."
+echo "[2/7] 正在配置基础中文支持 (fonts-noto-cjk, locales)..."
 if ! is_installed "fonts-noto-cjk" || ! is_installed "locales"; then
     apt-get install -y fonts-noto-cjk locales
 else
@@ -39,7 +39,7 @@ else
 fi
 
 # 3. 安装轻量中文输入法
-echo "[3/6] 正在安装轻量中文输入法 (fcitx, fcitx-pinyin)..."
+echo "[3/7] 正在安装轻量中文输入法 (fcitx, fcitx-pinyin)..."
 if ! is_installed "fcitx" || ! is_installed "fcitx-pinyin"; then
     apt-get install -y fcitx fcitx-pinyin
     # 简单的默认输入法设置
@@ -50,27 +50,77 @@ else
     echo "中文输入法 fcitx 及 fcitx-pinyin 已安装，跳过。"
 fi
 
-# 4. 安装常用基础工具和开发依赖
-echo "[4/6] 正在安装常用基础工具和开发依赖..."
-DEPS=("curl" "git" "python3" "python3-pip" "htop" "build-essential")
+# 4. 安装常用基础工具、开发依赖及 ChromeOS 风格核心组件
+echo "[4/7] 正在安装常用基础工具及 ChromeOS 风格核心组件..."
+# 添加 xfce4 核心组件、plank (Dock)、chromium (浏览器)、xserver-xorg-input-libinput (输入设备驱动支持)
+DEPS=("curl" "git" "python3" "python3-pip" "htop" "build-essential" "xfce4" "plank" "chromium" "xserver-xorg-input-libinput")
 for pkg in "${DEPS[@]}"; do
     if ! is_installed "$pkg"; then
-        echo "安装 $pkg ..."
+        echo "正在安装 $pkg ..."
         apt-get install -y "$pkg"
     else
         echo "$pkg 已安装，跳过。"
     fi
 done
 
-# 5. 自动检测并应用默认桌面壁纸
-echo "[5/6] 正在配置桌面壁纸..."
+# 5. ChromeOS 风格 UI 配置 (Plank & XFCE 面板)
+echo "[5/7] 正在配置 ChromeOS 风格 UI (Plank & XFCE面板)..."
+for user_dir in /home/*; do
+    if [ -d "$user_dir" ]; then
+        user_name=$(basename "$user_dir")
+
+        # 配置 Plank 自动启动
+        AUTOSTART_DIR="$user_dir/.config/autostart"
+        mkdir -p "$AUTOSTART_DIR"
+        cat << 'PLANK_EOF' > "$AUTOSTART_DIR/plank.desktop"
+[Desktop Entry]
+Name=Plank
+GenericName=Dock
+Comment=Stupidly simple.
+Categories=Utility;
+Type=Application
+Exec=plank
+Icon=plank
+Terminal=false
+NoDisplay=false
+PLANK_EOF
+        chown -R "$user_name:$user_name" "$AUTOSTART_DIR"
+
+        # 尝试隐藏 XFCE 底部面板 (Panel 2) 以为 Plank 留出空间
+        XFCE_PANEL_XML="$user_dir/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml"
+        if [ -f "$XFCE_PANEL_XML" ]; then
+            # 简单的处理：如果存在 panel-2，设置其自动隐藏 (autohide-behavior=2)
+            if grep -q "name=\"autohide-behavior\"" "$XFCE_PANEL_XML"; then
+                sed -i 's/<property name="autohide-behavior" type="uint" value="[0-9]*"\/>/<property name="autohide-behavior" type="uint" value="2"\/>/g' "$XFCE_PANEL_XML"
+            fi
+        fi
+
+        # 配置 XFWM4 合成器优化 (提升稳定性与流畅度)
+        XFWM4_XML="$user_dir/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml"
+        if [ -f "$XFWM4_XML" ]; then
+            # 确保合成器开启以支持 Plank 透明效果
+            if grep -q "name=\"use_compositing\"" "$XFWM4_XML"; then
+                sed -i 's/<property name="use_compositing" type="bool" value="false"\/>/<property name="use_compositing" type="bool" value="true"\/>/g' "$XFWM4_XML"
+            fi
+        fi
+    fi
+done
+echo "ChromeOS 风格 UI 及流畅度配置完成。"
+
+# 6. 自动检测并应用默认桌面壁纸
+echo "[6/7] 正在下载和配置 ChromeOS 经典桌面壁纸..."
 
 # 获取脚本所在的当前绝对路径
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+mkdir -p "$SCRIPT_DIR/assets"
 WALLPAPER_PATH="$SCRIPT_DIR/assets/default_wallpaper.jpg"
+WALLPAPER_URL="https://raw.githubusercontent.com/mananapr/chromeos-wallpapers/main/images/Chrome%20OS%20Default.jpg"
 
-if [ ! -f "$WALLPAPER_PATH" ]; then
-    echo "警告：未找到壁纸图片 $WALLPAPER_PATH，请确保 assets/default_wallpaper.jpg 存在。"
+echo "正在下载 ChromeOS 经典壁纸..."
+curl -sLf "$WALLPAPER_URL" -o "$WALLPAPER_PATH"
+
+if [ ! -f "$WALLPAPER_PATH" ] || [ ! -s "$WALLPAPER_PATH" ]; then
+    echo "警告：壁纸下载失败，请手动将壁纸放入 assets/default_wallpaper.jpg。"
 else
     # 遍历 /home/ 下的所有用户目录（排除系统默认目录）
     for user_dir in /home/*; do
@@ -112,6 +162,6 @@ else
     echo "壁纸配置尝试完成。"
 fi
 
-echo "[6/6] 所有任务执行完毕！"
+echo "[7/7] 所有任务执行完毕！"
 echo "=========================================="
 echo "配置完成，建议重启系统使所有设置生效 (reboot)。"

@@ -8,8 +8,11 @@
 1. 更新系统包管理器的 apt 源。
 2. 安装基础中文支持（fonts-noto-cjk、并配置系统 locale 为 zh_CN.UTF-8）。
 3. 安装轻量级中文输入法（fcitx 及其拼音模块）。
-4. 一键安装日常常用及开发相关的基础工具与依赖（curl, git, python3, pip, htop, build-essential）。
-5. 自动检测用户的桌面环境（目前支持并自动检测 XFCE 与 LXDE 轻量桌面），将 `assets/` 目录里的壁纸静默应用为当前默认系统桌面。
+4. **重构 ChromeOS 风格桌面**：
+   - 一键安装核心组件：`xfce4`（基础桌面）、`plank`（底部程序坞 Dock）、`chromium`（浏览器）及基础输入驱动。
+   - 自动隐藏冗余系统面板，优化 XFCE 窗口管理器合成器，提升稳定性和流畅度。
+5. 自动下载并应用经典的 ChromeOS 极简风格壁纸。
+6. 一键安装日常常用及开发相关的基础工具与依赖（curl, git, python3, pip, htop, build-essential）。
 
 ## 运行方法
 
